@@ -40,6 +40,8 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
 
   const url = 'https://suumo.jp/jj/chintai/ichiran/FR301FC001/?ar=030&bs=040&ra=013&rn=0240&ek=024019670&ek=024037560&ek=024016710&ek=024041310&ek=024041290&ek=024031840&ek=024018010&cb=0.0&ct=20.0&mb=0&mt=9999999&md=06&md=07&md=08&md=09&md=10&et=7&cn=9999999&tc=0400501&tc=0400502&tc=0400301&shkr1=03&shkr2=03&shkr3=03&shkr4=03&sngz=&po1=09';
 
+  const urlSp = 'https://suumo.jp/sp/chintai/tokyo/ek/?chinryomax=20&cinm%5B%5D=06&cinm%5B%5D=09&cinm%5B%5D=07&cinm%5B%5D=08&cinm%5B%5D=10&cinm%5B%5D=14&cinm%5B%5D=12&cinm%5B%5D=11&cinm%5B%5D=13&sjoken%5B%5D=024&sjoken%5B%5D=023&sjoken%5B%5D=015&et=7&sort=24&e%5B%5D=024019670&e%5B%5D=024037560&e%5B%5D=024016710&e%5B%5D=024041310&e%5B%5D=024041290&e%5B%5D=024031840&e%5B%5D=024018010';
+
   if (event.message.text.includes('検索')) {
     try {
       const properties = await scrapeProperties();
@@ -68,7 +70,7 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
                 action: {
                   type: 'uri',
                   label: '一覧で見る',
-                  uri: url
+                  uri: urlSp
                 }
               }
             ]
