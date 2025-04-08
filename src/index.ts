@@ -22,6 +22,14 @@ const middlewareConfig: MiddlewareConfig = {
 const client = new Client(clientConfig);
 const app = express();
 
+app.get('/health', (req: Request, res: Response) => {
+  console.log('Health check accessed:', {
+    timestamp: new Date().toISOString(),
+    path: req.path
+  });
+  res.status(200).json({ status: 'ok' });
+});
+
 app.post('/webhook', middleware(middlewareConfig), async (req: Request, res: Response): Promise<void> => {
   try {
     console.log('Webhook received:', {
