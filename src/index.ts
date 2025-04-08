@@ -24,17 +24,30 @@ const app = express();
 
 app.post('/webhook', middleware(middlewareConfig), async (req: Request, res: Response): Promise<void> => {
   try {
+    console.log('Webhook received:', {
+      timestamp: new Date().toISOString(),
+      body: req.body
+    });
+
     const events: WebhookEvent[] = req.body.events;
     await Promise.all(events.map(handleEvent));
     res.json({ success: true });
   } catch (err) {
-    console.error(err);
+    console.error('Webhook error:', {
+      timestamp: new Date().toISOString(),
+      error: err
+    });
     res.status(500).end();
   }
 });
 
 async function handleEvent(event: WebhookEvent): Promise<void> {
   if (event.type !== 'message' || event.message.type !== 'text') {
+    console.log('Skipping non-text message:', {
+      timestamp: new Date().toISOString(),
+      eventType: event.type,
+      messageType: event.type === 'message' ? event.message.type : null
+    });
     return;
   }
 
@@ -43,14 +56,29 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
   const urlSp = 'https://suumo.jp/sp/chintai/tokyo/ek/?chinryomax=20&cinm%5B%5D=06&cinm%5B%5D=09&cinm%5B%5D=07&cinm%5B%5D=08&cinm%5B%5D=10&cinm%5B%5D=14&cinm%5B%5D=12&cinm%5B%5D=11&cinm%5B%5D=13&sjoken%5B%5D=024&sjoken%5B%5D=023&sjoken%5B%5D=015&et=7&sort=24&e%5B%5D=024019670&e%5B%5D=024037560&e%5B%5D=024016710&e%5B%5D=024041310&e%5B%5D=024041290&e%5B%5D=024031840&e%5B%5D=024018010';
 
   if (event.message.text.includes('検索')) {
+    console.log('Search command received:', {
+      timestamp: new Date().toISOString(),
+      userId: event.source.userId,
+      message: event.message.text
+    });
+
     try {
+      console.log('Starting property scraping...');
       const properties = await scrapeProperties();
+      console.log('Properties scraped:', {
+        timestamp: new Date().toISOString(),
+        count: properties.length,
+        firstProperty: properties[0]
+      });
+
       const count = properties.length;
       const limitedProperties = properties.slice(0, 5);
 
-      // Flex Messageを送信（altTextに件数情報を含める）
+      // Flex Messageを送信
       const flexMessage = createPropertyFlexMessage(properties);
       flexMessage.altText = `物件を${count}件見つけました。${limitedProperties.length}件を表示します。`;
+
+      console.log('Sending messages to LINE...');
       await client.replyMessage(event.replyToken, [{
         type: 'text',
         text: '物件を' + count + '件見つけました。' + limitedProperties.length + '件を表示します。'
@@ -59,6 +87,19 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
         altText: '一覧で見る',
         contents: {
           type: 'bubble',
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: '詳細',
+                size: 'xs',
+                align: 'center',
+                color: '#aaaaaa'
+              }
+            ]
+          },
           footer: {
             type: 'box',
             layout: 'vertical',
@@ -77,14 +118,23 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
           }
         }
       }]);
+      console.log('Messages sent successfully');
     } catch (error) {
-      console.error('物件情報の取得に失敗しました:', error);
+      console.error('Error in property search:', {
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        } : error
+      });
       await client.replyMessage(event.replyToken, {
         type: 'text',
         text: '物件情報の取得に失敗しました。'
       });
     }
   } else if (event.message.text.includes('現在のリンク')) {
+    console.log('Link request received');
     await client.replyMessage(event.replyToken, {
       type: 'text',
       text: url
@@ -93,9 +143,11 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
 }
 
 async function scrapeProperties(): Promise<Property[]> {
+  console.log('Starting scraping process...');
   const url = 'https://suumo.jp/jj/chintai/ichiran/FR301FC001/?ar=030&bs=040&ra=013&rn=0240&ek=024019670&ek=024037560&ek=024016710&ek=024041310&ek=024041290&ek=024031840&ek=024018010&cb=0.0&ct=20.0&mb=0&mt=9999999&md=06&md=07&md=08&md=09&md=10&et=7&cn=9999999&tc=0400501&tc=0400502&tc=0400301&shkr1=03&shkr2=03&shkr3=03&shkr4=03&sngz=&po1=09';
 
   try {
+    console.log('Sending request to SUUMO...');
     const response = await axios.get(url, {
       headers: {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -104,12 +156,15 @@ async function scrapeProperties(): Promise<Property[]> {
         'Upgrade-Insecure-Requests': '1'
       }
     });
+    console.log('Response received from SUUMO');
 
     const $ = cheerio.load(response.data);
     const properties: Property[] = [];
 
+    console.log('Starting property extraction...');
     $('.cassetteitem').each((_, elem) => {
       const title = $(elem).find('.cassetteitem_content-title').text().trim().replace(/\s+/g, ' ');
+      console.log('Processing property:', { title });
       const address = $(elem).find('.cassetteitem_detail-col1').text().trim().replace(/\s+/g, ' ');
       // const imageUrl = $(elem).find('.casssetteitem_other-thumbnail-img').attr('src') || 'https://example.com/default-image.jpg';
       const imageUrl = $(elem).find('.js-linkImage').attr('rel') || '';
