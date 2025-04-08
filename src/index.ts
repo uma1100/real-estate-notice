@@ -49,7 +49,32 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
       // Flex Messageを送信（altTextに件数情報を含める）
       const flexMessage = createPropertyFlexMessage(properties);
       flexMessage.altText = `物件を${count}件見つけました。${limitedProperties.length}件を表示します。`;
-      await client.replyMessage(event.replyToken, flexMessage);
+      await client.replyMessage(event.replyToken, [{
+        type: 'text',
+        text: '物件を' + count + '件見つけました。' + limitedProperties.length + '件を表示します。'
+      }, flexMessage, {
+        type: 'flex',
+        altText: '一覧で見る',
+        contents: {
+          type: 'bubble',
+          footer: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'button',
+                style: 'link',
+                height: 'sm',
+                action: {
+                  type: 'uri',
+                  label: '一覧で見る',
+                  uri: url
+                }
+              }
+            ]
+          }
+        }
+      }]);
     } catch (error) {
       console.error('物件情報の取得に失敗しました:', error);
       await client.replyMessage(event.replyToken, {
@@ -107,6 +132,7 @@ async function scrapeProperties(): Promise<Property[]> {
         const layout = $(roomElem).find('.cassetteitem_madori').text().trim();
         const menseki = $(roomElem).find('.cassetteitem_menseki').text().trim();
         const age = $(elem).find('.cassetteitem_detail-col3').text().trim().replace(/\s+/g, ' ');
+        const layoutImageUrl = $(roomElem).find('.casssetteitem_other-thumbnail-img').attr('rel') || '';
 
         // タグ情報を取得
         const tags: string[] = [];
@@ -130,7 +156,7 @@ async function scrapeProperties(): Promise<Property[]> {
             menseki,
             age,
             access,
-            imageUrl,
+            imageUrl: layoutImageUrl,
             detailUrl,
             floor,
             rent,

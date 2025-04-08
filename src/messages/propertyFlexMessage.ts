@@ -3,7 +3,7 @@ import { Property } from '../types/property';
 
 export function createPropertyFlexMessage(properties: Property[]): FlexMessage {
   // 物件数を3件に制限
-  const limitedProperties = properties.slice(0, 3);
+  const limitedProperties = properties.slice(0, 5);
   const count = properties.length;
 
   return {
@@ -18,8 +18,6 @@ export function createPropertyFlexMessage(properties: Property[]): FlexMessage {
             type: 'image',
             url: property.imageUrl,
             size: 'full',
-            aspectRatio: '20:13',
-            aspectMode: 'cover'
           },
           body: {
             type: 'box',
@@ -67,17 +65,40 @@ export function createPropertyFlexMessage(properties: Property[]): FlexMessage {
                     contents: [
                       {
                         type: 'text',
-                        text: '家賃',
+                        text: '階層',
                         color: '#aaaaaa',
                         size: 'sm',
                         flex: 1
                       },
                       {
                         type: 'text',
-                        text: property.rent,
+                        text: property.floor,
                         wrap: true,
                         color: '#666666',
                         size: 'sm',
+                        flex: 5
+                      }
+                    ]
+                  },
+                  {
+                    type: 'box',
+                    layout: 'vertical',
+                    spacing: 'sm',
+                    contents: [
+                      {
+                        type: 'text',
+                        text: '家賃/管理費',
+                        color: '#aaaaaa',
+                        size: 'sm',
+                        flex: 1
+                      },
+                      {
+                        type: 'text',
+                        text: `${property.rent}/${property.managementFee}`,
+                        wrap: true,
+                        color: '#666666',
+                        size: 'sm',
+                        weight: 'bold',
                         flex: 5
                       }
                     ]
