@@ -1,9 +1,9 @@
 import { Client, ClientConfig, middleware, MiddlewareConfig, WebhookEvent } from '@line/bot-sdk';
 import axios from 'axios';
-import * as cheerio from 'cheerio';
 import express, { Request, Response } from 'express';
+import { getScrapingUrl, upsertScrapingUrl } from './lib/scrapingUrls';
 import { createPropertyFlexMessage } from './messages/propertyFlexMessage';
-import { Property } from './types/property';
+import { scrapeProperties } from './scraper/scraper';
 
 // axiosのデフォルト設定
 axios.defaults.headers.common['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -59,42 +59,74 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
     return;
   }
 
-  const url = 'https://suumo.jp/jj/chintai/ichiran/FR301FC001/?ar=030&bs=040&ra=013&rn=0240&ek=024019670&ek=024037560&ek=024016710&ek=024041310&ek=024041290&ek=024031840&ek=024018010&cb=0.0&ct=20.0&mb=0&mt=9999999&md=06&md=07&md=08&md=09&md=10&et=7&cn=9999999&tc=0400501&tc=0400502&tc=0400301&shkr1=03&shkr2=03&shkr3=03&shkr4=03&sngz=&po1=09';
+  let sourceId: string | undefined;
+  if (event.source.type === 'group') {
+    sourceId = event.source.groupId;
+  } else if (event.source.type === 'user') {
+    sourceId = event.source.userId;
+  }
 
-  const urlSp = 'https://suumo.jp/sp/chintai/tokyo/ek/?chinryomax=20&cinm%5B%5D=06&cinm%5B%5D=09&cinm%5B%5D=07&cinm%5B%5D=08&cinm%5B%5D=10&cinm%5B%5D=14&cinm%5B%5D=12&cinm%5B%5D=11&cinm%5B%5D=13&sjoken%5B%5D=024&sjoken%5B%5D=023&sjoken%5B%5D=015&et=7&sort=24&e%5B%5D=024019670&e%5B%5D=024037560&e%5B%5D=024016710&e%5B%5D=024041310&e%5B%5D=024041290&e%5B%5D=024031840&e%5B%5D=024018010';
+  if (!sourceId) {
+    console.error('Could not determine source ID (userId or groupId) from event:', event.source);
+    return;
+  }
 
   if (event.message.text.includes('検索')) {
     console.log('Search command received:', {
       timestamp: new Date().toISOString(),
-      userId: event.source.userId,
+      source: event.source,
       message: event.message.text
     });
 
     try {
-      console.log('Starting property scraping...');
-      const properties = await scrapeProperties();
-      console.log('Properties scraped:', {
-        timestamp: new Date().toISOString(),
-        count: properties.length,
-        firstProperty: properties[0]
-      });
+      console.log(`Starting property scraping for sourceId: ${sourceId}`);
+      const scrapingUrl = await getScrapingUrl(sourceId);
+
+      if (!scrapingUrl) {
+        await client.replyMessage(event.replyToken, {
+          type: 'text',
+          text: 'このトークルームに紐づくスクレイピングURLが見つかりません。設定を確認してください。'
+        });
+        console.log(`Scraping URL not found for sourceId: ${sourceId}`);
+        return;
+      }
+
+      const properties = await scrapeProperties(scrapingUrl.url);
 
       const count = properties.length;
-      const limitedProperties = properties.slice(0, 5);
 
-      // Flex Messageを送信
+      if (count === 0) {
+        await client.replyMessage(event.replyToken, {
+          type: 'text',
+          text: '条件に合う物件は見つかりませんでした。'
+        });
+        console.log('No properties found message sent.');
+        return;
+      }
+
       const flexMessage = createPropertyFlexMessage(properties);
-      flexMessage.altText = `物件を${count}件見つけました。${limitedProperties.length}件を表示します。`;
+      flexMessage.altText = `物件を見つけました。最大10件を表示しています。`;
 
-      console.log('Sending messages to LINE...');
-      await client.replyMessage(event.replyToken, [{
-        type: 'text',
-        text: '物件を' + count + '件見つけました。' + limitedProperties.length + '件を表示します。'
-      }, flexMessage, {
+      // console.log('Flex Message payload to be sent:', JSON.stringify(flexMessage, null, 2));
+
+      await client.replyMessage(event.replyToken, [flexMessage, {
         type: 'flex',
         altText: '一覧で見る',
         contents: {
           type: 'bubble',
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: '上記のリストは､最大10件を表示しています｡',
+                size: 'xs',
+                align: 'center',
+                color: '#aaaaaa'
+              }
+            ]
+          },
           footer: {
             type: 'box',
             layout: 'vertical',
@@ -106,7 +138,7 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
                 action: {
                   type: 'uri',
                   label: '一覧で見る',
-                  uri: urlSp
+                  uri: scrapingUrl.url
                 }
               }
             ]
@@ -130,109 +162,64 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
     }
   } else if (event.message.text.includes('現在のリンク')) {
     console.log('Link request received');
+    const scrapingUrl = await getScrapingUrl(sourceId);
+    if (!scrapingUrl) {
+      await client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: 'このトークルームに紐づくURLが見つかりません。'
+      });
+      return;
+    }
     await client.replyMessage(event.replyToken, {
       type: 'text',
-      text: url
+      text: `現在のリンク\n${scrapingUrl.url}`
     });
-  }
-}
-
-async function scrapeProperties(): Promise<Property[]> {
-  console.log('Starting scraping process...');
-  const url = 'https://suumo.jp/jj/chintai/ichiran/FR301FC001/?ar=030&bs=040&ra=013&rn=0240&ek=024019670&ek=024037560&ek=024016710&ek=024041310&ek=024041290&ek=024031840&ek=024018010&cb=0.0&ct=20.0&mb=0&mt=9999999&md=06&md=07&md=08&md=09&md=10&et=7&cn=9999999&tc=0400501&tc=0400502&tc=0400301&shkr1=03&shkr2=03&shkr3=03&shkr4=03&sngz=&po1=09';
-
-  try {
-    console.log('Sending request to SUUMO...');
-    const response = await axios.get(url, {
-      headers: {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'ja,en-US;q=0.7,en;q=0.3',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1'
-      }
-    });
-    console.log('Response received from SUUMO');
-
-    const $ = cheerio.load(response.data);
-    const properties: Property[] = [];
-
-    console.log('Starting property extraction...');
-    $('.cassetteitem').each((_, elem) => {
-      const title = $(elem).find('.cassetteitem_content-title').text().trim().replace(/\s+/g, ' ');
-      console.log('Processing property:', { title });
-      const address = $(elem).find('.cassetteitem_detail-col1').text().trim().replace(/\s+/g, ' ');
-      // const imageUrl = $(elem).find('.casssetteitem_other-thumbnail-img').attr('src') || 'https://example.com/default-image.jpg';
-      const imageUrl = $(elem).find('.js-linkImage').attr('rel') || '';
-      const detailUrl = 'https://suumo.jp' + $(elem).find('.js-cassette_link').attr('href');
-
-      // アクセス情報を取得
-      const access: string[] = [];
-      $(elem).find('.cassetteitem_detail-col2 .cassetteitem_detail-text').each((_, accessElem) => {
-        const accessText = $(accessElem).text().trim().replace(/\s+/g, ' ');
-        if (accessText) {
-          access.push(accessText);
-        }
-      });
-
-      // 各物件の詳細情報を取得
-      $(elem).find('.js-cassette_link').each((_, roomElem) => {
-        const floor = $(roomElem).find('td:nth-child(3)').text().trim();
-        const rent = $(roomElem).find('.cassetteitem_price--rent .cassetteitem_other-emphasis').text().trim();
-        const managementFee = $(roomElem).find('.cassetteitem_price--administration').text().trim();
-        const deposit = $(roomElem).find('.cassetteitem_price--deposit').text().trim();
-        const gratuity = $(roomElem).find('.cassetteitem_price--gratuity').text().trim();
-        const layout = $(roomElem).find('.cassetteitem_madori').text().trim();
-        const menseki = $(roomElem).find('.cassetteitem_menseki').text().trim();
-        const age = $(elem).find('.cassetteitem_detail-col3').text().trim().replace(/\s+/g, ' ');
-        const layoutImageUrl = $(roomElem).find('.casssetteitem_other-thumbnail-img').attr('rel') || '';
-
-        // タグ情報を取得
-        const tags: string[] = [];
-        $(roomElem).find('.cassetteitem-tag').each((_, tagElem) => {
-          const tag = $(tagElem).text().trim();
-          if (tag) {
-            tags.push(tag);
-          }
-        });
-
-        // 詳細リンクを取得
-        const detailUrl = 'https://suumo.jp' + $(roomElem).find('.cassetteitem_other-linktext').attr('href');
-
-        // 最初の8件のみを取得
-        if (properties.length < 8) {
-          properties.push({
-            title,
-            address,
-            price: rent,
-            layout,
-            menseki,
-            age,
-            access,
-            imageUrl: layoutImageUrl,
-            detailUrl,
-            floor,
-            rent,
-            managementFee,
-            deposit,
-            gratuity,
-            tags
-          });
-        }
-      });
+  } else if (event.message.text.startsWith('更新')) {
+    console.log('Update command received:', {
+      timestamp: new Date().toISOString(),
+      source: event.source,
+      message: event.message.text
     });
 
-    return properties;
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      console.error('SUUMOへのアクセスに失敗しました:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        message: error.message
-      });
-    } else {
-      console.error('予期せぬエラーが発生しました:', error);
+    const messageText = event.message.text;
+    const httpsIndex = messageText.indexOf('https://');
+
+    let newUrl = '';
+    if (httpsIndex !== -1) {
+      newUrl = messageText.substring(httpsIndex).trim();
     }
-    throw new Error('物件情報の取得に失敗しました。しばらく時間をおいて再度お試しください。');
+
+    if (!newUrl) {
+      await client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: 'メッセージ内に有効なURL (https:// で始まるもの) が見つかりませんでした。'
+      });
+      return;
+    }
+
+    try {
+      console.log(`Attempting to upsert URL for sourceId: ${sourceId}`);
+      await upsertScrapingUrl(sourceId, newUrl);
+      console.log(`URL upsert successful for sourceId: ${sourceId}`);
+
+      await client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: '更新が完了しました。'
+      });
+
+    } catch (error) {
+      console.error('Error during URL upsert:', {
+        timestamp: new Date().toISOString(),
+        sourceId: sourceId,
+        error: error
+      });
+      await client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: 'URLの更新に失敗しました。システム管理者に確認してください。'
+      });
+    }
+  } else {
+    console.log('Unknown command received:', event.message.text);
   }
 }
 

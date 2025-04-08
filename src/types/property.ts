@@ -1,7 +1,6 @@
 export interface Property {
   title: string;
   address: string;
-  price: string;
   layout: string;
   age: string;
   imageUrl: string;
