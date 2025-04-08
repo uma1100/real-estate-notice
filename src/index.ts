@@ -95,19 +95,6 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
         altText: '一覧で見る',
         contents: {
           type: 'bubble',
-          body: {
-            type: 'box',
-            layout: 'vertical',
-            contents: [
-              {
-                type: 'text',
-                text: '詳細',
-                size: 'xs',
-                align: 'center',
-                color: '#aaaaaa'
-              }
-            ]
-          },
           footer: {
             type: 'box',
             layout: 'vertical',
