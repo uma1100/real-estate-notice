@@ -80,7 +80,7 @@ export async function scrapeProperties(url: string): Promise<Property[]> {
       });
     });
 
-    return properties.slice(0, 10); // 最大10件までに制限
+    return properties;
   } catch (error) {
     console.error('Error during scraping:', {
       timestamp: new Date().toISOString(),

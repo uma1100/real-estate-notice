@@ -3,7 +3,7 @@ import { Property } from '../types/property';
 
 export function createPropertyFlexMessage(properties: Property[]): FlexMessage {
   // 物件数を3件に制限
-  const limitedProperties = properties.slice(0, 5);
+  const limitedProperties = properties.slice(0, 10);
   const count = properties.length;
 
   return {
