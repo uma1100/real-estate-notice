@@ -1,7 +1,7 @@
 import { Client, ClientConfig, middleware, MiddlewareConfig, WebhookEvent } from '@line/bot-sdk';
 import axios from 'axios';
 import express, { Request, Response } from 'express';
-import { saveProperties } from './lib/propertySaver';
+import { checkExistingProperties, saveProperties } from './lib/propertySaver';
 import { getScrapingUrl, upsertScrapingUrl } from './lib/scrapingUrls';
 import { createPropertyFlexMessage } from './messages/propertyFlexMessage';
 import { scrapeProperties } from './scraper/scraper';
@@ -93,33 +93,37 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
       }
 
       const properties = await scrapeProperties(scrapingUrl.url);
+      console.log('Raw property data:', properties);
 
-      let savedInfo = '保存処理はスキップされました(0件)';
-      if (properties.length > 0) {
-        try {
-          const attemptedCount = properties.length;
-          const actualSavedCount = await saveProperties(properties, scrapingUrl.id);
-          savedInfo = `DB保存処理完了 (試行: ${attemptedCount}件, 実際の保存数(重複除く): ${actualSavedCount})`;
-          console.log(savedInfo);
-        } catch (saveError) {
-          console.error('Failed to save properties to database:', saveError);
-          savedInfo = 'DBへの保存中にエラーが発生しました。';
-        }
-      }
-      console.log(savedInfo);
-
-      const count = properties.length;
-
-      if (count === 0) {
+      if (!properties || properties.length === 0) {
         await client.replyMessage(event.replyToken, {
           type: 'text',
-          text: '条件に合う物件は見つかりませんでした。'
+          text: '物件が見つかりませんでした。'
         });
-        console.log('No properties found message sent.');
         return;
       }
 
-      const flexMessage = createPropertyFlexMessage(properties);
+      // 既存の物件をチェック
+      const detailUrls = properties.map(p => p.detailUrl);
+      const existingUrls = await checkExistingProperties(detailUrls, scrapingUrl.id);
+
+      // 新規物件のみを抽出
+      const newProperties = properties.filter(p => !existingUrls.has(p.detailUrl));
+
+      if (newProperties.length === 0) {
+        await client.replyMessage(event.replyToken, {
+          type: 'text',
+          text: '新規の物件は見つかりませんでした。'
+        });
+        return;
+      }
+
+      // 新規物件をデータベースに保存
+      const savedCount = await saveProperties(newProperties, scrapingUrl.id);
+      console.log(`Saved ${savedCount} new properties to database`);
+
+      // 新規物件のみを通知
+      const flexMessage = createPropertyFlexMessage(newProperties);
       flexMessage.altText = `物件を見つけました。最大10件を表示しています。`;
 
       // console.log('Flex Message payload to be sent:', JSON.stringify(flexMessage, null, 2));

@@ -2,6 +2,36 @@ import { Property } from '../types/property';
 import { supabase } from './supabase';
 
 /**
+ * 指定された物件のdetail_urlとscraping_url_idが既にデータベースに存在するかチェックする
+ * @param detailUrls チェックする物件のdetail_urlの配列
+ * @param scrapingUrlId チェックするscraping_url_id
+ * @returns 存在するdetail_urlのSet
+ */
+export async function checkExistingProperties(detailUrls: string[], scrapingUrlId: number): Promise<Set<string>> {
+  if (!detailUrls || detailUrls.length === 0) {
+    return new Set();
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('properties')
+      .select('detail_url')
+      .in('detail_url', detailUrls)
+      .eq('scraping_url_id', scrapingUrlId);
+
+    if (error) {
+      console.error('Error checking existing properties:', error);
+      throw error;
+    }
+
+    return new Set(data?.map(item => item.detail_url) || []);
+  } catch (error) {
+    console.error('Exception during checkExistingProperties:', error);
+    throw error;
+  }
+}
+
+/**
  * スクレイピングで取得した物件情報を Supabase の properties テーブルに upsert する。
  * scraping_url_id と detail_url が一致する場合、既存のレコードを更新する。
  * @param properties 保存/更新する物件情報の配列
