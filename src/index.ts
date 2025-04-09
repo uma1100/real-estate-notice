@@ -1,6 +1,7 @@
 import { Client, ClientConfig, middleware, MiddlewareConfig, WebhookEvent } from '@line/bot-sdk';
 import axios from 'axios';
 import express, { Request, Response } from 'express';
+import { saveProperties } from './lib/propertySaver';
 import { getScrapingUrl, upsertScrapingUrl } from './lib/scrapingUrls';
 import { createPropertyFlexMessage } from './messages/propertyFlexMessage';
 import { scrapeProperties } from './scraper/scraper';
@@ -92,6 +93,20 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
       }
 
       const properties = await scrapeProperties(scrapingUrl.url);
+
+      let savedInfo = '保存処理はスキップされました(0件)';
+      if (properties.length > 0) {
+        try {
+          const attemptedCount = properties.length;
+          const actualSavedCount = await saveProperties(properties, scrapingUrl.id);
+          savedInfo = `DB保存処理完了 (試行: ${attemptedCount}件, 実際の保存数(重複除く): ${actualSavedCount})`;
+          console.log(savedInfo);
+        } catch (saveError) {
+          console.error('Failed to save properties to database:', saveError);
+          savedInfo = 'DBへの保存中にエラーが発生しました。';
+        }
+      }
+      console.log(savedInfo);
 
       const count = properties.length;
 

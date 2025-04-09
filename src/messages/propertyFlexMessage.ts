@@ -161,7 +161,7 @@ export function createPropertyFlexMessage(properties: Property[]): FlexMessage {
                       },
                       {
                         type: 'text',
-                        text: property.age,
+                        text: property.age.replace(/\s+/g, ''),
                         wrap: true,
                         color: '#666666',
                         size: 'sm',
