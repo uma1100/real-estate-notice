@@ -1,17 +1,29 @@
 import { FlexBubble, FlexMessage } from '@line/bot-sdk';
 import { Property } from '../types/property';
 
-export function createPropertyFlexMessage(properties: Property[]): FlexMessage {
-  // 物件数を3件に制限
-  const limitedProperties = properties.slice(0, 10);
-  const count = properties.length;
+/**
+ * 物件情報からFlexMessageを作成する
+ * @param properties 物件情報の配列
+ * @param startIndex 表示開始インデックス（0から開始）
+ * @param endIndex 表示終了インデックス（この数値は含まない）
+ * @param totalCount 全物件数
+ * @returns FlexMessage
+ */
+export function createPropertyFlexMessage(
+  properties: Property[],
+  startIndex: number,
+  endIndex: number,
+  totalCount: number
+): FlexMessage {
+  // 指定範囲の物件を抽出
+  const targetProperties = properties.slice(startIndex, endIndex);
 
   return {
     type: 'flex',
-    altText: `物件を${count}件見つけました。${limitedProperties.length}件を表示します。`,
+    altText: `物件を${totalCount}件見つけました。${startIndex + 1}件目から${Math.min(endIndex, totalCount)}件目を表示します。`,
     contents: {
       type: 'carousel',
-      contents: limitedProperties.map(property => {
+      contents: targetProperties.map(property => {
         const bubble: FlexBubble = {
           type: 'bubble',
           hero: {

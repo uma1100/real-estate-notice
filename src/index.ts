@@ -122,13 +122,28 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
       const savedCount = await saveProperties(newProperties, scrapingUrl.id);
       console.log(`Saved ${savedCount} new properties to database`);
 
-      // 新規物件のみを通知
-      const flexMessage = createPropertyFlexMessage(newProperties);
-      flexMessage.altText = `物件を見つけました。最大10件を表示しています。`;
+      // 新規物件のみを通知（最大20件まで）
+      const totalProperties = Math.min(newProperties.length, 20);
+      const messages: Array<{
+        type: 'flex';
+        altText: string;
+        contents: any;
+      }> = [];
 
-      // console.log('Flex Message payload to be sent:', JSON.stringify(flexMessage, null, 2));
+      // 1件目から10件目までのFlexMessage
+      if (totalProperties > 0) {
+        const firstFlexMessage = createPropertyFlexMessage(newProperties, 0, 10, totalProperties);
+        messages.push(firstFlexMessage);
+      }
 
-      await client.replyMessage(event.replyToken, [flexMessage, {
+      // 11件目から20件目までのFlexMessage（11件以上ある場合のみ）
+      if (totalProperties > 10) {
+        const secondFlexMessage = createPropertyFlexMessage(newProperties, 10, 20, totalProperties);
+        messages.push(secondFlexMessage);
+      }
+
+      // 検索条件を表示するFlexMessage
+      messages.push({
         type: 'flex',
         altText: '一覧で見る',
         contents: {
@@ -139,7 +154,7 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
             contents: [
               {
                 type: 'text',
-                text: '上記のリストは､最大10件を表示しています｡',
+                text: '上記のリストは以下の検索条件で絞り込まれた物件になります｡',
                 size: 'xs',
                 align: 'center',
                 color: '#aaaaaa'
@@ -163,7 +178,9 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
             ]
           }
         }
-      }]);
+      });
+
+      await client.replyMessage(event.replyToken, messages);
       console.log('Messages sent successfully');
     } catch (error) {
       console.error('Error in property search:', {
