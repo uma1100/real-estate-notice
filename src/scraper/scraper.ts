@@ -6,11 +6,17 @@ let puppeteerCore: any;
 let puppeteer: any;
 
 try {
-  chromium = require('chrome-aws-lambda');
+  // 新しいChromiumパッケージを使用
+  chromium = require('@sparticuz/chromium');
   puppeteerCore = require('puppeteer-core');
+  console.log('✅ @sparticuz/chromium loaded successfully');
 } catch (error) {
-  console.log('Chrome AWS Lambda not available, using local Puppeteer');
-  puppeteer = require('puppeteer-core');
+  console.log('⚠️ Chromium not available, using local Puppeteer');
+  try {
+    puppeteer = require('puppeteer');
+  } catch (puppeteerError) {
+    puppeteer = require('puppeteer-core');
+  }
 }
 import { Property } from '../types/property';
 
@@ -25,14 +31,24 @@ export async function scrapeCanaryProperties(url: string): Promise<Property[]> {
     const isVercel = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
     
     if (isVercel && chromium && puppeteerCore) {
-      console.log('Using Chrome AWS Lambda for Vercel...');
-      browser = await puppeteerCore.launch({
-        args: chromium.args,
-        defaultViewport: chromium.defaultViewport,
-        executablePath: await chromium.executablePath,
-        headless: chromium.headless,
-        ignoreHTTPSErrors: true,
-      });
+      console.log('🔧 Using @sparticuz/chromium for Vercel...');
+      
+      try {
+        const executablePath = await chromium.executablePath();
+        console.log('✅ Chromium executable path:', executablePath);
+        
+        browser = await puppeteerCore.launch({
+          args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
+          defaultViewport: chromium.defaultViewport,
+          executablePath: executablePath,
+          headless: true,
+          ignoreHTTPSErrors: true,
+        });
+        console.log('✅ Browser launched successfully with @sparticuz/chromium');
+      } catch (launchError) {
+        console.error('❌ @sparticuz/chromium launch failed:', launchError);
+        throw launchError;
+      }
     } else {
       console.log('Using local Puppeteer...');
       // ローカル開発環境用
