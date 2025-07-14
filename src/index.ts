@@ -4,7 +4,7 @@ import express, { Request, Response } from 'express';
 import { checkExistingProperties, saveProperties } from './lib/propertySaver';
 import { getScrapingUrl, upsertScrapingUrl } from './lib/scrapingUrls';
 import { createPropertyFlexMessage } from './messages/propertyFlexMessage';
-import { scrapeProperties } from './scraper/scraper';
+import { scrapeProperties, scrapeCanaryProperties } from './scraper/scraper';
 
 // axiosのデフォルト設定
 axios.defaults.headers.common['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -92,7 +92,10 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
         return;
       }
 
-      const properties = await scrapeProperties(scrapingUrl.url);
+      // URLに応じて適切なスクレイパーを選択
+      const properties = scrapingUrl.url.includes('web.canary-app.jp')
+        ? await scrapeCanaryProperties(scrapingUrl.url)
+        : await scrapeProperties(scrapingUrl.url);
       console.log('Raw property data:', properties);
 
       if (!properties || properties.length === 0) {
@@ -235,12 +238,16 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
 
     try {
       console.log(`Attempting to upsert URL for sourceId: ${sourceId}`);
+      
       await upsertScrapingUrl(sourceId, newUrl);
       console.log(`URL upsert successful for sourceId: ${sourceId}`);
 
+      // URLの種類を判定してメッセージを変更
+      const siteType = newUrl.includes('web.canary-app.jp') ? 'Canary' : 'SUUMO';
+      
       await client.replyMessage(event.replyToken, {
         type: 'text',
-        text: '更新が完了しました。'
+        text: `URLの更新が完了しました。（${siteType}サイト）`
       });
 
     } catch (error) {

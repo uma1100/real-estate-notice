@@ -25,7 +25,7 @@ export async function getScrapingUrl(sourceId: string): Promise<ScrapingUrl | nu
   }
 }
 
-// 新しい関数: URLをupsertする
+// URLをupsertする関数
 export async function upsertScrapingUrl(sourceId: string, newUrl: string): Promise<void> {
   console.log(`Upserting URL for target_id: ${sourceId}, URL: ${newUrl}`);
   try {
@@ -35,7 +35,7 @@ export async function upsertScrapingUrl(sourceId: string, newUrl: string): Promi
         {
           target_id: sourceId, // このIDを持つ行を探すか、新しく作る
           url: newUrl,        // URLを更新または設定
-          updated_at: new Date().toISOString(), // ★★★ 追加: upsert時に現在時刻を設定 ★★★
+          updated_at: new Date().toISOString(), // upsert時に現在時刻を設定
         },
         {
           onConflict: 'target_id' // target_id が重複した場合にUPDATEする
@@ -44,7 +44,6 @@ export async function upsertScrapingUrl(sourceId: string, newUrl: string): Promi
 
     if (error) {
       console.error('Error upserting scraping URL:', error);
-      // RLS違反(23503など)、制約違反(23505など)の可能性
       throw error; // エラーを呼び出し元に投げる
     }
     console.log(`Successfully upserted URL for target_id: ${sourceId}`);
