@@ -28,10 +28,18 @@ export async function scrapeCanaryProperties(url: string): Promise<Property[]> {
     console.log('Launching browser...');
     
     // Vercel環境かどうかを判定
-    const isVercel = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
+    const isVercel = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.VERCEL_ENV;
+    console.log('🏗️ Environment check:', {
+      VERCEL: process.env.VERCEL,
+      AWS_LAMBDA_FUNCTION_NAME: process.env.AWS_LAMBDA_FUNCTION_NAME,
+      VERCEL_ENV: process.env.VERCEL_ENV,
+      isVercel,
+      hasChromium: !!chromium,
+      hasPuppeteerCore: !!puppeteerCore
+    });
     
-    if (isVercel && chromium && puppeteerCore) {
-      console.log('🔧 Using @sparticuz/chromium for Vercel...');
+    if (chromium && puppeteerCore) {
+      console.log('🔧 Using @sparticuz/chromium (serverless environment detected)...');
       
       try {
         const executablePath = await chromium.executablePath();
@@ -47,26 +55,57 @@ export async function scrapeCanaryProperties(url: string): Promise<Property[]> {
         console.log('✅ Browser launched successfully with @sparticuz/chromium');
       } catch (launchError) {
         console.error('❌ @sparticuz/chromium launch failed:', launchError);
-        throw launchError;
+        // フォールバック: エラーメッセージを返す
+        console.log('🔄 Falling back to error response...');
+        const errorProperty: Property = {
+          title: 'Vercelブラウザ起動エラー',
+          address: 'サーバーレス環境でのブラウザ起動に失敗しました',
+          floor: '-',
+          rent: '-',
+          managementFee: '-',
+          deposit: '-',
+          gratuity: '-',
+          layout: '-',
+          menseki: '-',
+          age: '-',
+          imageUrl: 'https://example.com/error-notice.jpg',
+          detailUrl: url,
+          access: ['技術的な問題が発生しています'],
+          tags: ['エラー']
+        };
+        return [errorProperty];
       }
     } else {
-      console.log('Using local Puppeteer...');
+      console.log('💻 Using local Puppeteer...');
       // ローカル開発環境用
       if (!puppeteer) {
-        puppeteer = require('puppeteer');
+        console.log('📦 Loading puppeteer package...');
+        try {
+          puppeteer = require('puppeteer');
+        } catch (requireError) {
+          console.error('❌ Failed to load puppeteer:', requireError);
+          throw new Error('Puppeteerパッケージが見つかりません');
+        }
       }
-      browser = await puppeteer.launch({
-        headless: true,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-gpu'
-        ]
-      });
+      
+      try {
+        browser = await puppeteer.launch({
+          headless: true,
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--disable-gpu'
+          ]
+        });
+        console.log('✅ Local browser launched successfully');
+      } catch (launchError) {
+        console.error('❌ Local browser launch failed:', launchError);
+        throw launchError;
+      }
     }
 
     const page = await browser.newPage();
