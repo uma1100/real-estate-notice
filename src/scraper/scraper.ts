@@ -6,15 +6,17 @@ let puppeteerCore: any;
 let puppeteer: any;
 
 try {
-  // 新しいChromiumパッケージを使用
+  // Vercel/Lambda用パッケージを試す
   chromium = require('@sparticuz/chromium');
   puppeteerCore = require('puppeteer-core');
-  console.log('✅ @sparticuz/chromium loaded successfully');
+  console.log('✅ @sparticuz/chromium loaded (serverless environment)');
 } catch (error) {
-  console.log('⚠️ Chromium not available, using local Puppeteer');
+  console.log('💻 Serverless packages not available, using local Puppeteer');
   try {
     puppeteer = require('puppeteer');
+    console.log('✅ Local puppeteer loaded');
   } catch (puppeteerError) {
+    console.log('⚠️ Falling back to puppeteer-core');
     puppeteer = require('puppeteer-core');
   }
 }
