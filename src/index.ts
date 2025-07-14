@@ -96,7 +96,7 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
       const properties = scrapingUrl.url.includes('web.canary-app.jp')
         ? await scrapeCanaryProperties(scrapingUrl.url)
         : await scrapeProperties(scrapingUrl.url);
-      console.log('Raw property data:', properties);
+      console.log(`Raw property data: ${properties.length} properties found`, properties);
 
       if (!properties || properties.length === 0) {
         await client.replyMessage(event.replyToken, {
