@@ -33,20 +33,30 @@ export async function scrapeCanaryProperties(url: string): Promise<Property[]> {
     // ScrapingBeeでページを取得（JavaScript実行有効）
     const htmlContent = await scrapingBeeClient.scrapeUrl(url, {
       renderJs: true,       // JavaScript実行を有効化
-      waitFor: 5000,        // 5秒待機（物件情報の読み込みを待つ）
       blockAds: true,       // 広告をブロック
     });
+
 
     console.log('🐝 ScrapingBee response received, parsing with Cheerio...');
     const $ = cheerio.load(htmlContent);
     
     console.log('🔍 Searching for property elements...');
+    console.log('📄 HTML length:', htmlContent.length);
+    console.log('🔍 Sample HTML (first 500 chars):', htmlContent.substring(0, 500));
+    
     const properties: Property[] = [];
     const seenUrls = new Set<string>(); // 重複チェック用
 
     // メインセレクターで物件を検索
     const roomElements = $('[data-testid="search-result-room-thumbail"]');
-    console.log(`📦 Found ${roomElements.length} property elements`);
+    console.log(`📦 Found ${roomElements.length} property elements with [data-testid="search-result-room-thumbail"]`);
+    
+    // 代替セレクターも試す
+    const altElements1 = $('.sc-eba299fd-2');
+    console.log(`📦 Found ${altElements1.length} elements with .sc-eba299fd-2 (property titles)`);
+    
+    const altElements2 = $('.sc-25310353-0');
+    console.log(`📦 Found ${altElements2.length} elements with .sc-25310353-0 (room cards)`);
 
     roomElements.each((_, element) => {
       try {

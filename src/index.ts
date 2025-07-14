@@ -135,13 +135,13 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
 
       // 1件目から10件目までのFlexMessage
       if (totalProperties > 0) {
-        const firstFlexMessage = createPropertyFlexMessage(newProperties, 0, 10, totalProperties);
+        const firstFlexMessage = createPropertyFlexMessage(newProperties, 0, Math.min(10, totalProperties), totalProperties);
         messages.push(firstFlexMessage);
       }
 
       // 11件目から20件目までのFlexMessage（11件以上ある場合のみ）
       if (totalProperties > 10) {
-        const secondFlexMessage = createPropertyFlexMessage(newProperties, 10, 20, totalProperties);
+        const secondFlexMessage = createPropertyFlexMessage(newProperties, 10, totalProperties, totalProperties);
         messages.push(secondFlexMessage);
       }
 

@@ -218,7 +218,7 @@ export function createPropertyFlexMessage(
                 action: {
                   type: 'uri',
                   label: '詳細を見る',
-                  uri: property.detailUrl
+                  uri: property.detailUrl.startsWith('http') ? property.detailUrl : `https://web.canary-app.jp${property.detailUrl}`
                 }
               }
             ]
