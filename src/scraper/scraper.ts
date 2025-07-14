@@ -29,18 +29,47 @@ export async function scrapeCanaryProperties(url: string): Promise<Property[]> {
   try {
     console.log('Launching browser...');
     
-    // Vercel環境かどうかを判定
-    const isVercel = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.VERCEL_ENV;
+    // 環境変数で強制的に判定
+    const useChromium = process.env.USE_CHROMIUM === 'true';
     console.log('🏗️ Environment check:', {
       VERCEL: process.env.VERCEL,
       AWS_LAMBDA_FUNCTION_NAME: process.env.AWS_LAMBDA_FUNCTION_NAME,
       VERCEL_ENV: process.env.VERCEL_ENV,
-      isVercel,
+      USE_CHROMIUM: process.env.USE_CHROMIUM,
+      useChromium,
       hasChromium: !!chromium,
       hasPuppeteerCore: !!puppeteerCore
     });
     
-    if (chromium && puppeteerCore) {
+    if (useChromium) {
+      console.log('🔧 Forcing @sparticuz/chromium usage based on USE_CHROMIUM env var...');
+      
+      if (!chromium || !puppeteerCore) {
+        console.log('⚠️ Required packages not available, installing...');
+        try {
+          chromium = require('@sparticuz/chromium');
+          puppeteerCore = require('puppeteer-core');
+        } catch (requireError) {
+          console.error('❌ Failed to load required packages:', requireError);
+          const errorProperty: Property = {
+            title: 'パッケージエラー',
+            address: '@sparticuz/chromiumパッケージが見つかりません',
+            floor: '-',
+            rent: '-',
+            managementFee: '-',
+            deposit: '-',
+            gratuity: '-',
+            layout: '-',
+            menseki: '-',
+            age: '-',
+            imageUrl: 'https://example.com/package-error.jpg',
+            detailUrl: url,
+            access: ['package.jsonに@sparticuz/chromiumを追加してください'],
+            tags: ['パッケージエラー']
+          };
+          return [errorProperty];
+        }
+      }
       console.log('🔧 Using @sparticuz/chromium (serverless environment detected)...');
       
       try {
