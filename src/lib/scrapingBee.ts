@@ -17,13 +17,13 @@ export class ScrapingBeeClient {
   } = {}): Promise<string> {
     try {
       console.log('🐝 ScrapingBee: Starting scrape request for:', url);
-      
+
       const requestParams: any = {
         api_key: this.apiKey,
         url: url,
         render_js: String(options.renderJs ?? true),
         block_ads: String(options.blockAds ?? true),
-        wait: '10000',  // 10秒待機してからHTMLを取得
+        wait: '7000',  // 5秒待機してからHTMLを取得
         premium_proxy: 'true',  // プレミアムプロキシを使用
         stealth_proxy: 'true',  // ステルスモードを有効
       };
@@ -79,7 +79,7 @@ export class ScrapingBeeClient {
         const status = error.response?.status;
         const responseData = error.response?.data;
         const message = responseData?.message || error.message;
-        
+
         console.error('🐝 ScrapingBee API Error Details:', {
           status,
           responseData: JSON.stringify(responseData, null, 2),
@@ -91,7 +91,7 @@ export class ScrapingBeeClient {
             block_ads: String(options.blockAds ?? true)
           }
         });
-        
+
         if (status === 401) {
           throw new Error('ScrapingBee API認証エラー: APIキーを確認してください');
         } else if (status === 403) {
@@ -101,10 +101,10 @@ export class ScrapingBeeClient {
         } else if (status === 400) {
           throw new Error(`ScrapingBee APIリクエストエラー: ${responseData?.error || message}`);
         }
-        
+
         throw new Error(`ScrapingBee APIエラー (${status}): ${message}`);
       }
-      
+
       throw new Error('ScrapingBeeでの取得に失敗しました');
     }
   }
@@ -115,7 +115,7 @@ export class ScrapingBeeClient {
         params: { api_key: this.apiKey },
         timeout: 10000
       });
-      
+
       return response.data;
     } catch (error) {
       console.error('ScrapingBee account info error:', error);
