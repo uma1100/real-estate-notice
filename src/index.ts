@@ -121,10 +121,6 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
         return;
       }
 
-      // 新規物件をデータベースに保存
-      const savedCount = await saveProperties(newProperties, scrapingUrl.id);
-      console.log(`Saved ${savedCount} new properties to database`);
-
       // 新規物件のみを通知（最大20件まで）
       const totalProperties = Math.min(newProperties.length, 20);
       const messages: Array<{
@@ -183,8 +179,13 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
         }
       });
 
+      // LINE通知を送信
       await client.replyMessage(event.replyToken, messages);
       console.log('Messages sent successfully');
+
+      // LINE通知が成功した場合のみ、新規物件をデータベースに保存
+      const savedCount = await saveProperties(newProperties, scrapingUrl.id);
+      console.log(`Saved ${savedCount} new properties to database`);
     } catch (error) {
       console.error('Error in property search:', {
         timestamp: new Date().toISOString(),
@@ -194,10 +195,16 @@ async function handleEvent(event: WebhookEvent): Promise<void> {
           stack: error.stack
         } : error
       });
-      await client.replyMessage(event.replyToken, {
-        type: 'text',
-        text: '物件情報の取得に失敗しました。'
-      });
+      
+      // エラー時はpushMessageを使用して確実にメッセージを送信
+      try {
+        await client.pushMessage(sourceId, {
+          type: 'text',
+          text: '物件情報の取得に失敗しました。もう一度お試しください。'
+        });
+      } catch (pushError) {
+        console.error('Failed to send error message via pushMessage:', pushError);
+      }
     }
   } else if (event.message.text.includes('現在のリンク')) {
     console.log('Link request received');

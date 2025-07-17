@@ -37,7 +37,7 @@ export function createPropertyFlexMessage(
             contents: [
               {
                 type: 'text',
-                text: property.title,
+                text: property.title || '-',
                 weight: 'bold',
                 size: 'xl',
                 wrap: true
@@ -62,7 +62,7 @@ export function createPropertyFlexMessage(
                       },
                       {
                         type: 'text',
-                        text: property.address,
+                        text: property.address || '-',
                         wrap: true,
                         color: '#666666',
                         size: 'sm',
@@ -84,7 +84,7 @@ export function createPropertyFlexMessage(
                       },
                       {
                         type: 'text',
-                        text: property.floor,
+                        text: property.floor || '-',
                         wrap: true,
                         color: '#666666',
                         size: 'sm',
@@ -106,7 +106,7 @@ export function createPropertyFlexMessage(
                       },
                       {
                         type: 'text',
-                        text: `${property.rent}/${property.managementFee}`,
+                        text: `${property.rent || '-'}/${property.managementFee || '-'}`,
                         wrap: true,
                         color: '#666666',
                         size: 'sm',
@@ -129,7 +129,7 @@ export function createPropertyFlexMessage(
                       },
                       {
                         type: 'text',
-                        text: property.layout,
+                        text: property.layout || '-',
                         wrap: true,
                         color: '#666666',
                         size: 'sm',
@@ -151,7 +151,7 @@ export function createPropertyFlexMessage(
                       },
                       {
                         type: 'text',
-                        text: property.menseki,
+                        text: property.menseki || '-',
                         wrap: true,
                         color: '#666666',
                         size: 'sm',
@@ -173,7 +173,7 @@ export function createPropertyFlexMessage(
                       },
                       {
                         type: 'text',
-                        text: property.age.replace(/\s+/g, ''),
+                        text: property.age ? property.age.replace(/\s+/g, '') : '-',
                         wrap: true,
                         color: '#666666',
                         size: 'sm',
